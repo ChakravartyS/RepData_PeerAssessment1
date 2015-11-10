@@ -1,142 +1,191 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
+title: "Reproducible Research - Peer Assessment 1"
 author: "Srinivas Chakravarty"
-date: "17 August 2015"
-output: 
-  html_document:
-    keep_md: true
+date: "10 November 2015"
+output:
+    html_document:
+      keep_md: yes
+      toc: yes
 ---
 
+### Global Options
 
-## Housekeeping
-```{r houseKeeping}
-echo = TRUE
+```{r setoptions, echo = TRUE}
 
-source.zipFileName.chr <- "activity.zip"
-source.zipFile.url <-
-    "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
-
-extract.csvFileName.chr <- "activity.csv"
-
-pkg.to.load.chr <- c ("ggplot2", "knitr")
-lapply (pkg.to.load.chr, library, character.only = TRUE)
+library ("knitr")
+opts_chunk $ set (comment = "->", echo = TRUE)
 ```
 
+### Housekeeping
+```{r houseKeeping}
 
-## Loading and preprocessing the data
-```{r loadingData}
-## ---- Download Activity Data zip Dataset as Needed ----
-if (! (file.exists (source.zipFileName.chr))) {
+pkgsNeeded <- c ("ggplot2", "knitr")
+newPkgs <- pkgsNeeded [!(pkgsNeeded  %in%  installed.packages() [, "Package"])]
 
-    download.file (source.zipFile.url,
-                   destfile = source.zipFileName.chr)
+if (length (newPkgs)) {
+    install.packages (newPkgs)
 }
 
-## ---- Extract Activity Data CSV File ----
-unzip (source.zipFileName.chr)
+lapply (pkgsNeeded, library, character.only = TRUE)
 
-## ---- Create Activity Data Frame from CSV File ----
-activityData.df <- read.csv (extract.csvFileName.chr)
+sourceZipFileName <- "repdata-data-activity.zip"
+sourceZipFileUrl <-
+    "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+
+extractCsvFileName <- "activity.csv"
+
 ```
 
+### Loading and preprocessing data
+```{r loadPreprocess}
 
-## What is mean total number of steps taken per day?
-```{r meanTotalSteps}
-## ---- Calculate Total Number of Steps, ignoring Missing Data ----
-totalSteps.int <- tapply (activityData.df $ steps,
-                          activityData.df $ date,
-                          FUN=sum,
-                          na.rm = TRUE) 
+if (! (file.exists (sourceZipFileName))) {
+    download.file (sourceZipFileUrl,
+                   destfile = sourceZipFileName)
+}
 
-## ---- Create Histogram of Total Number of Steps Taken per Day ----
-hist (totalSteps.int,
+unzip (sourceZipFileName)
+
+activityData <- read.csv (extractCsvFileName)
+
+```
+
+### What is mean total number of steps taken per day?
+
+#### 1. Calculate total number of steps taken per day
+
+```{r TotalSteps}
+
+totalSteps <- tapply (activityData $ steps,
+                      activityData $ date,
+                      FUN = sum,
+                      na.rm = TRUE)
+```
+
+#### 2. Make histogram (A) of total number of steps taken each day
+
+```{r HistogramA}
+
+hist (totalSteps,
       col = "cyan",
       breaks = 5,
-      main = "Histogram of Total Number of Steps Taken Each Day",
+      main = "Total Number of Steps Taken Each Day",
       xlab = "Total number of Steps")
-
-# ---- Calculate Mean and Median of Total Number of Steps Taken per Day ----
-mean (totalSteps.int, na.rm=TRUE)
-median (totalSteps.int, na.rm = TRUE)
 ```
 
+#### 3. Calculate mean and median of total number of steps taken per day
 
-## What is the average daily activity pattern?
-```{r averageDailyActivity}
-## ---- Make Time Series Plot ----
-averageSteps.df <- aggregate (x = list (steps = activityData.df $ steps), 
-                              by = list (interval = activityData.df $ interval),
-                              FUN=mean,
-                              na.rm=TRUE)
+```{r MeanMedianA}
 
-ggplot (data = averageSteps.df,
+mean (totalSteps, na.rm = TRUE)
+median (totalSteps, na.rm = TRUE)
+
+```
+
+### What is the average daily activity pattern?
+
+#### 1. Make time series plot
+
+```{r TimeSeries}
+
+averageSteps <- aggregate (x = list (steps = activityData $ steps), 
+                          by = list (interval = activityData $ interval),
+                          FUN=mean,
+                          na.rm=TRUE)
+
+ggplot (data = averageSteps,
         aes (x = interval, y = steps)) +
         geom_line (color = "blue") +
         xlab ("5-Minute Interval") +
         ylab ("Average Number of Steps Taken")
-
-
-#---- Determine 5-Minute Interval with Maximum Number of Steps ----
-averageSteps.df [which.max(averageSteps.df $ steps),] $ interval
 ```
 
+#### 2. Determine 5-minute interval with maximum number of steps
 
-## Inputing missing values
-```{r inputMissingValues}
-## ---- Determine Number of Missing Values in Activity Dataset ----
-sum (is.na (activityData.df))
+```{r MaxSteps}
 
+averageSteps [which.max(averageSteps $ steps),] $ interval
 
-## ---- Create New Activity Dataset with Missing Values as Mean of 5-Minute Interval ----
-activityData.noNA.df <- activityData.df
+```
 
-for (i in 1 : nrow (activityData.noNA.df)) {
-    if (is.na (activityData.noNA.df $ steps [i])) {
-        activityData.noNA.df $ steps [i] <- 
-            averageSteps.df [which (activityData.df $ interval [i] == 
-                                        averageSteps.df $ interval), ] $ steps
+### Imputing missing values
+
+#### 1. Calculate total number of missing values in dataset
+
+```{r MissingVals}
+
+sum (is.na (activityData))
+```
+
+#### 2. Devise strategy to fill in all missing values in dataset
+
+Fill in missing values in dataset with mean of 5 minute interval
+
+#### 3. Create new dataset from original dataset and with missing data filled in
+
+```{r FillMissingVals}
+
+activityDataNoNA <- activityData
+
+for (i in 1 : nrow (activityDataNoNA)) {
+    if (is.na (activityDataNoNA $ steps [i])) {
+        activityDataNoNA $ steps [i] <- 
+            averageSteps [which (activityData $ interval [i] == 
+                                    averageSteps $ interval), ] $ steps
     }
 }
+```
 
-## ---- Calculate Total Number of Steps Using Activity Dataset with NO Missing Data ----
-totalSteps.noNA.int <- tapply (activityData.noNA.df $ steps,
-                          activityData.noNA.df $ date,
+#### 4A. Make histogram (B) of total number of steps taken each day
+
+```{r HistogramB}
+
+totalStepsNoNA <- tapply (activityDataNoNA $ steps,
+                          activityDataNoNA $ date,
                           FUN=sum,
                           na.rm = TRUE) 
 
-## ---- Create Histogram of Total Number of Steps Taken per Day (NO Missing Data) ----
-hist (totalSteps.noNA.int,
+hist (totalStepsNoNA,
       col = "cyan",
       breaks = 5,
-      main = "Histogram of Total Number of Steps Taken Each Day 
-      (NO Missing Data)",
+      main = "Total Number of Steps Taken Each Day (NO Missing Data)",
       xlab = "Total number of Steps")
+
 ```
 
+#### 4B. Calculate mean and median of total number of steps taken per day (NO missing data)
 
-## Are there differences in activity patterns between weekdays and weekends?
-```{r patternsWeekdaysWeekends}
-# ---- Calculate Mean and Median of Total Number of Steps Taken per Day (NO Missing Data) ----
-mean (totalSteps.noNA.int)
-median (totalSteps.noNA.int)
+```{r MeanMedianB}
 
+mean (totalStepsNoNA)
+median (totalStepsNoNA)
 
-## ---- Create New Factor Variable Day as Weekday or Weekend, Based on Date ---- 
+```
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+#### 1. Create new factor variable to indicate if a given date is weekday or weekend day
+
+```{r WeekWeekendDay}
+
 weekdayWeekend <- function (givenDate) {
-    if (weekdays (givenDate) %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+    if (weekdays (givenDate) %in% 
+            c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
         return("weekday")
     else if (weekdays (givenDate) %in% c("Saturday", "Sunday"))
         return("weekend")
 }
 
-activityData.noNA.df $ day <- sapply (as.Date (activityData.noNA.df $ date),
-                                      FUN=weekdayWeekend)
-    
+activityDataNoNA $ day <- sapply (as.Date (activityDataNoNA $ date), FUN=weekdayWeekend)
 
-## ---- Make Panel Plot of Time Series of 5-Minute Intervals vs. Average Number of Steps ----
-averageSteps.noNA.df <- aggregate (steps ~ interval + day,
-                                   data = activityData.noNA.df,
-                                   mean)
-ggplot (averageSteps.noNA.df, aes(interval, steps)) + geom_line(color = "blue") + 
-    facet_grid(day ~ .) + xlab ("5-Minute Interval") + ylab ("Average Number of Steps")
+```
+
+#### 2. Make a panel plot of time series of 5-minute interval average number of steps taken, averaged across weekday days or weekend days
+
+```{r PanelPlot}
+
+avgStepsNoNA <- aggregate (steps ~ interval + day, data = activityDataNoNA, mean)
+
+ggplot (avgStepsNoNA, aes (interval, steps)) + geom_line (color = "blue") + 
+    facet_grid (day ~ .) + xlab ("5-Minute Interval") + ylab ("Average Number of Steps")
 ```
